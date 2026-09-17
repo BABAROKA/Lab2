@@ -6,6 +6,9 @@ const envSchema = z.object({
     DATABASE_URL: z.url(),
     REDIS_URL: z.url(),
     CORS_ORIGIN: z.url(),
+    JWT_ACCESS_KEY: z.string().min(32),
+    JWT_REFRESH_KEY: z.string().min(32),
+    NODE_ENV: z.enum(["dev", "prod"]),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
