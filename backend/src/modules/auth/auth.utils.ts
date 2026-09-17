@@ -1,7 +1,8 @@
+import argon2 from "argon2";
+import { createHash, randomUUID } from "node:crypto";
+import { env } from "../../config/env";
+import { accessClaimsSchema, refreshClaimsSchema, TokenHash, tokenHashSchema } from "./auth.schemas";
 import jwt from "jsonwebtoken";
-import { env } from "../config/env.js";
-import { randomUUID } from "node:crypto";
-import { accessClaimsSchema, refreshClaimsSchema } from "../modules/auth/auth.schemas.js";
 
 export const createAccessToken = (uuid: string): string => {
     return jwt.sign({ sub: uuid }, env.JWT_ACCESS_KEY, { expiresIn: "15m" });
@@ -37,4 +38,23 @@ export const generateTokens = (userUuid: string) => {
         accessToken,
         refreshToken,
     };
+}
+
+export const hashPassword = (password: string): Promise<string> => {
+    return argon2.hash(password);
+}
+
+export const verifyPassword = (password: string, passwordHash: string): Promise<Boolean> => {
+    return argon2.verify(passwordHash, password);
+}
+
+export const hashToken = (token: string): TokenHash | null => {
+    const hash = createHash("sha256").update(token).digest("base64");
+    const result = tokenHashSchema.safeParse(hash);
+
+    if (!result.success) {
+        return null;
+    }
+
+    return result.data ?? null;
 }

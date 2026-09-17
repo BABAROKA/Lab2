@@ -1,16 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db/client.js";
 import { users } from "../../db/schema/users.js";
-import type { NewUser, UpdateUser, User } from "./users.types.js";
+import { NewUser, UpdateUser, User } from "./users.schema.js";
 
 export class UserRepository {
     async findByEmail(email: string): Promise<User | null> {
         const result = await db.select().from(users).where(eq(users.email, email)).limit(1).execute();
-        return result[0] ?? null;
-    }
-
-    async findByUsername(username: string): Promise<User | null> {
-        const result = await db.select().from(users).where(eq(users.username, username)).limit(1).execute();
         return result[0] ?? null;
     }
 

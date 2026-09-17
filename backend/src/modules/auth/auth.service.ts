@@ -1,11 +1,13 @@
 import { createAccessToken, createRefreshToken } from "../../utils/jwt.js";
 import { hashPassword, verifyPassword } from "../../utils/password.js";
 import { UserRepository } from "../users/users.repository.js";
-import { AuthResponse, LoginInput, RegisterInput } from "./auth.schemas.js";
+import { AuthResponse, LoginInput, RefreshToken, RegisterInput } from "./auth.schemas.js";
+import { hashToken } from "./auth.utils.js";
 
 export class AuthService {
     constructor(
         private readonly userRepository: UserRepository,
+        private readonly authRepository: AuthResponse,
     ) { }
 
     async register(input: RegisterInput) {
@@ -14,15 +16,11 @@ export class AuthService {
             throw new Error("Email already in use");
         }
 
-        const existinUsername = await this.userRepository.findByUsername(input.username);
-        if (!existinUsername) {
-            throw new Error("Username already in use");
-        }
-
         const passwordHash = await hashPassword(input.password);
 
         const user = await this.userRepository.create({
-            username: input.username,
+            firstName: input.firstName,
+            lastName: input.lastName,
             email: input.email,
             passwordHash
         });
@@ -66,7 +64,7 @@ export class AuthService {
         }
     }
 
-    async refresh() { }
-
-    async access() { }
+    async rotate_token(refreshToken: RefreshToken) {
+        const tokenHash = hashToken()
+    }
 }

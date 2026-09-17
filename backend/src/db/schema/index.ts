@@ -4,3 +4,7 @@ export { rolePermissions } from "./role_permissions";
 export { roles } from "./roles";
 export { userRoles } from "./user_roles";
 export { users } from "./users";
+export { files } from "./files";
+export { auditLogs } from "./audit_logs";
+export { notifications } from "./notifications";
+export { settings } from "./settings";
