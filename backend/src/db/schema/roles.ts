@@ -1,18 +1,24 @@
-import { pgTable, bigint, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, bigint, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+
+export const roleNameEnum = pgEnum(
+    "role_name",
+    [
+        "admin",
+        "user",
+    ]
+)
 
 export const roles = pgTable(
     "roles",
     {
         id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
-        name: text("name").notNull().unique(),
+        name: roleNameEnum("name").notNull().unique(),
         description: text("description").notNull(),
         createdAt: timestamp("created_at", {
             withTimezone: true,
             mode: "date",
         }).notNull().defaultNow(),
-        updatedAt: timestamp("updated_at", {
-            withTimezone: true,
-            mode: "date",
-        }).notNull().defaultNow(),
     }
 );
+
+export type RoleName = (typeof roleNameEnum.enumValues)[number];

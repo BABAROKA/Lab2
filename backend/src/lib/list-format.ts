@@ -1,0 +1,38 @@
+import { Response } from "express";
+import { toCsv } from "./csv.js";
+import { toXlsxBuffer } from "./xlsx-export.js";
+
+export type ListFormat = "json" | "csv" | "xlsx";
+
+export const sendList = <T extends object>(
+    res: Response,
+    filename: string,
+    rows: T[],
+    format: ListFormat,
+): void => {
+    const records = rows as Record<string, unknown>[];
+    if (format === "csv") {
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${filename}.csv"`,
+        );
+        res.send(toCsv(records));
+        return;
+    }
+
+    if (format === "xlsx") {
+        res.setHeader(
+            "Content-Type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        );
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${filename}.xlsx"`,
+        );
+        res.send(toXlsxBuffer(records));
+        return;
+    }
+
+    res.json(rows);
+};

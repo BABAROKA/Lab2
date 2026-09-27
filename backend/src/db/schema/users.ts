@@ -5,7 +5,8 @@ export const users = pgTable(
     {
         id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
         uuid: uuid("uuid").defaultRandom().notNull().unique(),
-        username: text("username").notNull().unique(),
+        firstName: text("first_name").notNull(),
+        lastName: text("last_name"),
         email: text("email").notNull().unique(),
         passwordHash: text("password_hash").notNull(),
         isActive: boolean("is_active").notNull().default(true),
@@ -16,6 +17,6 @@ export const users = pgTable(
         updatedAt: timestamp("updated_at", {
             withTimezone: true,
             mode: "date",
-        }).notNull().defaultNow(),
+        }).notNull().defaultNow().$onUpdate(() => new Date()),
     },
 );
