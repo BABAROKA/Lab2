@@ -4,20 +4,20 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
+        "test": "tsx --test tests/*.test.ts",
         "dev": "tsx watch src/server.ts",
         "build": "tsc",
         "start": "node dist/server.js",
         "db:generate": "drizzle-kit generate",
-        "db:migrate": "drizzle-kit migrate"
-        "typecheck": "tsc --noEmit",
-        "db:seed": "tsx src/db/seed/index.ts"
+        "db:migrate": "drizzle-kit migrate",
+        "db:seed": "tsx src/db/seed/index.ts",
+        "typecheck": "tsc --noEmit"
     },
     "keywords": [],
     "type": "commonjs",
     "dependencies": {
         "argon2": "^0.45.1",
-        "cookie": "^2.0.1",
+        "cookie": "^1.0.2",
         "cookie-parser": "^1.4.7",
         "cors": "^2.8.6",
         "dotenv": "^17.4.2",

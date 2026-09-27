@@ -4,19 +4,20 @@ import { toXlsxBuffer } from "./xlsx-export.js";
 
 export type ListFormat = "json" | "csv" | "xlsx";
 
-export const sendList = (
+export const sendList = <T extends object>(
     res: Response,
     filename: string,
-    rows: Record<string, unknown>[],
+    rows: T[],
     format: ListFormat,
 ): void => {
+    const records = rows as Record<string, unknown>[];
     if (format === "csv") {
         res.setHeader("Content-Type", "text/csv");
         res.setHeader(
             "Content-Disposition",
             `attachment; filename="${filename}.csv"`,
         );
-        res.send(toCsv(rows));
+        res.send(toCsv(records));
         return;
     }
 
@@ -29,7 +30,7 @@ export const sendList = (
             "Content-Disposition",
             `attachment; filename="${filename}.xlsx"`,
         );
-        res.send(toXlsxBuffer(rows));
+        res.send(toXlsxBuffer(records));
         return;
     }
 

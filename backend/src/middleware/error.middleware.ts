@@ -1,12 +1,11 @@
 import { ErrorRequestHandler } from "express";
-import { AppError } from "../errors";
-import z from "zod";
+import jwt from "jsonwebtoken";
+import { z } from "zod";
+import { AppError } from "../errors.js";
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     if (err instanceof AppError) {
-        res.status(err.statusCode).json({
-            message: err.message,
-        });
+        res.status(err.statusCode).json({ message: err.message });
         return;
     }
 
@@ -21,12 +20,16 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
         return;
     }
 
+    if (err instanceof jwt.JsonWebTokenError) {
+        res.status(401).json({ message: "Invalid or expired token" });
+        return;
+    }
+
     if (err?.type === "entity.parse.failed") {
         res.status(400).json({ message: "Malformed JSON body" });
         return;
     }
 
-    res.status(500).json({
-        message: "Internal server error",
-    });
+    console.error(err);
+    res.status(500).json({ message: "Internal server error" });
 };

@@ -1,20 +1,6 @@
+import { isUniqueViolation } from "../../db/errors.js";
 import {
-    createAccessToken,
-    createRefreshToken,
-    generateTokens,
-    hashToken,
-    verifyRefreshToken,
-} from "./auth.utils";
-import { hashPassword, verifyPassword } from "./auth.utils";
-import { UserRepository } from "../users/users.repository";
-import {
-    AuthResponse,
-    IpAddress,
-    LoginInput,
-    RegisterInput,
-} from "./auth.schemas";
-import { AuthRepository } from "./auth.repository";
-import {
+    AccountDeactivatedError,
     EmailAlreadyInUseError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
@@ -24,7 +10,24 @@ import {
     RefreshTokenRevokedError,
     SamePasswordError,
     UserNotFoundError,
-} from "../../errors";
+} from "../../errors.js";
+import { UserRepository } from "../users/users.repository.js";
+import { User } from "../users/users.schema.js";
+import { AuthRepository } from "./auth.repository.js";
+import {
+    AuthResponse,
+    IpAddress,
+    LoginInput,
+    RegisterInput,
+} from "./auth.schemas.js";
+import {
+    generateTokens,
+    hashPassword,
+    hashToken,
+    refreshTokenExpiry,
+    verifyPassword,
+    verifyRefreshToken,
+} from "./auth.utils.js";
 
 export class AuthService {
     constructor(
@@ -32,181 +35,149 @@ export class AuthService {
         private readonly authRepository: AuthRepository,
     ) { }
 
-    /**
-     * @throws
-     */
-    async register(input: RegisterInput): Promise<AuthResponse> {
-        const existingEmail = await this.userRepository.findByEmail(
-            input.email,
-        );
-        if (existingEmail) {
+    /** @throws */
+    async register(
+        input: RegisterInput,
+        ipAddress: IpAddress,
+    ): Promise<AuthResponse> {
+        if (await this.userRepository.findByEmail(input.email)) {
             throw new EmailAlreadyInUseError();
         }
 
         const passwordHash = await hashPassword(input.password);
 
-        const user = await this.userRepository.create({
-            firstName: input.firstName,
-            lastName: input.lastName,
-            email: input.email,
-            passwordHash,
-        });
-
-        if (!user?.uuid) {
-            throw new UserNotFoundError();
+        let user: User;
+        try {
+            user = await this.userRepository.createWithDefaultRole({
+                firstName: input.firstName,
+                lastName: input.lastName,
+                email: input.email,
+                passwordHash,
+            });
+        } catch (err) {
+            if (isUniqueViolation(err)) throw new EmailAlreadyInUseError();
+            throw err;
         }
 
-        const accessToken = createAccessToken(user.uuid);
-        const refreshToken = createRefreshToken(user.uuid);
-
-        return {
-            uuid: user.uuid,
-            accessToken,
-            refreshToken,
-        };
+        return this.issueSession(user, ipAddress);
     }
 
-    /**
-     * @throws
-     */
-    async login(input: LoginInput): Promise<AuthResponse> {
+    /** @throws */
+    async login(
+        input: LoginInput,
+        ipAddress: IpAddress,
+    ): Promise<AuthResponse> {
         const user = await this.userRepository.findByEmail(input.email);
-        if (!user) {
-            throw new InvalidCredentialsError();
-        }
+        if (!user) throw new InvalidCredentialsError();
 
-        if (!user.uuid) {
-            throw new UserNotFoundError();
-        }
+        const validPassword = await verifyPassword(
+            input.password,
+            user.passwordHash,
+        );
+        if (!validPassword) throw new InvalidCredentialsError();
 
-        const validPassword = await verifyPassword(input.password, user.passwordHash);
-        if (!validPassword) {
-            throw new InvalidCredentialsError();
-        }
+        if (!user.isActive) throw new AccountDeactivatedError();
 
-        const accessToken = createAccessToken(user.uuid);
-        const refreshToken = createRefreshToken(user.uuid);
-
-        return {
-            uuid: user.uuid,
-            accessToken,
-            refreshToken,
-        };
+        return this.issueSession(user, ipAddress);
     }
 
-    /*
-     * @throws
-     */
-    async logout(refreshToken: string) {
-        const tokenHash = hashToken(refreshToken);
-        if (!tokenHash) throw new Error();
-
-        const tokenData = await this.authRepository.findTokenByHash(tokenHash);
+    /** @throws */
+    async logout(refreshToken: string): Promise<void> {
+        const tokenData = await this.authRepository.findTokenByHash(
+            hashToken(refreshToken),
+        );
         if (!tokenData) return;
 
-        this.authRepository.revokeToken(tokenData.id);
+        await this.authRepository.revokeToken(tokenData.id);
     }
 
-    /**
-     * @throws
-     */
+    /** @throws */
     async rotateRefreshToken(
         currentToken: string,
         ipAddress: IpAddress,
     ): Promise<AuthResponse> {
-        const claims = verifyRefreshToken(currentToken);
+        verifyRefreshToken(currentToken);
 
-        const currentTokenHash = hashToken(currentToken);
-        if (!currentTokenHash) throw new Error();
-
-        const tokenData =
-            await this.authRepository.findTokenByHash(currentTokenHash);
+        const tokenData = await this.authRepository.findTokenByHash(
+            hashToken(currentToken),
+        );
         if (!tokenData) throw new InvalidRefreshTokenError();
-        if (tokenData.revokedAt !== null) throw new RefreshTokenRevokedError();
+
+        if (tokenData.revokedAt !== null) {
+            await this.authRepository.revokeAllForUser(tokenData.userId);
+            throw new RefreshTokenRevokedError();
+        }
         if (tokenData.expiresAt <= new Date())
             throw new RefreshTokenExpiredError();
         if (tokenData.ipAddress !== ipAddress) throw new NewIpAddressError();
 
-        const userData = await this.userRepository.findByUuid(claims.sub);
-        if (!userData || !userData.isActive)
-            throw new InvalidRefreshTokenError();
+        const user = await this.userRepository.findById(tokenData.userId);
+        if (!user || !user.isActive) throw new InvalidRefreshTokenError();
 
-        const tokens = generateTokens(userData.uuid);
-        const refreshClaims = verifyRefreshToken(tokens.refreshToken);
+        const tokens = generateTokens(user.uuid);
 
-        const newRefreshTokenHash = hashToken(tokens.refreshToken);
-        if (!newRefreshTokenHash) throw new Error();
-
-        const newRefreshToken = {
-            userId: userData.id,
-            tokenHash: newRefreshTokenHash,
+        const rotated = await this.authRepository.rotateToken(tokenData.id, {
+            userId: user.id,
+            tokenHash: hashToken(tokens.refreshToken),
             ipAddress,
-            expiresAt: new Date(refreshClaims.exp * 1000),
-        };
-        const revokedToken = this.authRepository.rotateToken(
-            tokenData.id,
-            newRefreshToken,
-        );
-        if (!revokedToken) throw new RefreshTokenAlreadyUsedError();
+            expiresAt: refreshTokenExpiry(),
+        });
+        if (!rotated) throw new RefreshTokenAlreadyUsedError();
 
-        return {
-            uuid: userData.uuid,
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-        };
+        return { uuid: user.uuid, ...tokens };
     }
 
-    /**
-     * @throws
-     */
+    /** @throws */
     async changePassword(
         uuid: string,
         currentPassword: string,
         newPassword: string,
     ): Promise<Date> {
-        const newPasswordHash = await hashPassword(newPassword);
+        const user = await this.userRepository.findByUuid(uuid);
+        if (!user) throw new UserNotFoundError();
 
-        const userData = await this.userRepository.findByUuid(uuid);
-        if (!userData) throw new UserNotFoundError();
+        if (!(await verifyPassword(currentPassword, user.passwordHash)))
+            throw new InvalidCredentialsError();
+        if (currentPassword === newPassword) throw new SamePasswordError();
 
-        const validCurrentPassword = await verifyPassword(
-            currentPassword,
-            userData.passwordHash,
-        );
-        if (!validCurrentPassword) throw new InvalidCredentialsError();
-
-        const verifyNewPassword = await verifyPassword(
-            newPassword,
-            userData.passwordHash,
-        );
-        if (verifyNewPassword) throw new SamePasswordError();
-
-        const result = await this.userRepository.updatePasswordByUuid(
+        const updated = await this.userRepository.updatePasswordByUuid(
             uuid,
-            newPasswordHash,
+            await hashPassword(newPassword),
         );
-        if (!result) throw new Error();
+        if (!updated) throw new UserNotFoundError();
 
-        return result.updatedAt;
+        await this.authRepository.revokeAllForUser(user.id);
+        return updated.updatedAt;
     }
 
-    /**
-     * @throws
-     */
-    async deactivateAccount(uuid: string, password: string) {
-        const passwordHash = await hashPassword(password);
-        const userData = await this.userRepository.findByUuid(uuid);
-        if (!userData) throw new UserNotFoundError();
+    /** @throws */
+    async deactivateAccount(uuid: string, password: string): Promise<Date> {
+        const user = await this.userRepository.findByUuid(uuid);
+        if (!user) throw new UserNotFoundError();
 
-        const validPassword = await verifyPassword(
-            password,
-            userData.passwordHash,
-        );
-        if (validPassword) throw new InvalidCredentialsError();
+        if (!(await verifyPassword(password, user.passwordHash)))
+            throw new InvalidCredentialsError();
 
-        const result = await this.userRepository.deactivateByUuid(uuid);
-        if (!result) throw new Error();
+        const updated = await this.userRepository.deactivateByUuid(uuid);
+        if (!updated) throw new UserNotFoundError();
 
-        return result.updatedAt;
+        await this.authRepository.revokeAllForUser(user.id);
+        return updated.updatedAt;
+    }
+
+    private async issueSession(
+        user: Pick<User, "id" | "uuid">,
+        ipAddress: IpAddress,
+    ): Promise<AuthResponse> {
+        const tokens = generateTokens(user.uuid);
+
+        await this.authRepository.createToken({
+            userId: user.id,
+            tokenHash: hashToken(tokens.refreshToken),
+            ipAddress,
+            expiresAt: refreshTokenExpiry(),
+        });
+
+        return { uuid: user.uuid, ...tokens };
     }
 }
