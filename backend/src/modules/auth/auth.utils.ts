@@ -1,60 +1,76 @@
 import argon2 from "argon2";
 import { createHash, randomUUID } from "node:crypto";
 import { env } from "../../config/env";
-import { accessClaimsSchema, refreshClaimsSchema, TokenHash, tokenHashSchema } from "./auth.schemas";
+import {
+    AccessClaims,
+    accessClaimsSchema,
+    RefreshClaims,
+    refreshClaimsSchema,
+    TokenHash,
+    tokenHashSchema,
+} from "./auth.schemas";
 import jwt from "jsonwebtoken";
+import {
+    InvalidAccessTokenClaimsError,
+    InvalidRefreshTokenClaimsError,
+} from "../../errors";
+
+export const refreshTokenExpiry = (): Date =>
+    new Date(Date.now() + env.REFRESH_TOKEN_TTL_SECONDS * 1000);
 
 export const createAccessToken = (uuid: string): string => {
-    return jwt.sign({ sub: uuid }, env.JWT_ACCESS_KEY, { expiresIn: "15m" });
-}
+    return jwt.sign({ sub: uuid }, env.JWT_ACCESS_KEY, {
+        expiresIn: env.ACCESS_TOKEN_TTL_SECONDS,
+        algorithm: "HS256",
+    });
+};
 
 export const createRefreshToken = (uuid: string): string => {
-    return jwt.sign({ sub: uuid, jti: randomUUID() }, env.JWT_REFRESH_KEY, { expiresIn: "30d" });
-}
+    return jwt.sign({ sub: uuid, jti: randomUUID() }, env.JWT_REFRESH_KEY, {
+        expiresIn: env.REFRESH_TOKEN_TTL_SECONDS,
+        algorithm: "HS256",
+    });
+};
 
-export const verifyAccessToken = (token: string) => {
-    const decoded = jwt.verify(token, env.JWT_ACCESS_KEY);
+/**
+ * @throws
+ */
+export const verifyAccessToken = (token: string): AccessClaims => {
+    const decoded = jwt.verify(token, env.JWT_ACCESS_KEY, {
+        algorithms: ["HS256"],
+    });
 
-    const result = accessClaimsSchema.safeParse(decoded);
-    if (!result.success) throw new Error("Invalid access token claims");
+    const result = accessClaimsSchema.parse(decoded);
+    return result;
+};
 
-    return result.data;
-}
+/**
+ * @throws
+ */
+export const verifyRefreshToken = (token: string): RefreshClaims => {
+    const decoded = jwt.verify(token, env.JWT_REFRESH_KEY, {
+        algorithms: ["HS256"],
+    });
 
-export const verifyRefreshToken = (token: string) => {
-    const decoded = jwt.verify(token, env.JWT_REFRESH_KEY);
+    const result = refreshClaimsSchema.parse(decoded);
+    return result;
+};
 
-    const result = refreshClaimsSchema.safeParse(decoded);
-    if (!result.success) throw new Error("Invalid refresh token claims");
+export const generateTokens = (userUuid: string) => ({
+    accessToken: createAccessToken(userUuid),
+    refreshToken: createRefreshToken(userUuid),
+});
 
-    return result.data;
-}
+export const hashPassword = async (password: string): Promise<string> => {
+    return await argon2.hash(password);
+};
 
-export const generateTokens = (userUuid: string) => {
-    const accessToken = createAccessToken(userUuid);
-    const refreshToken = createRefreshToken(userUuid);
+export const verifyPassword = async (
+    password: string,
+    passwordHash: string,
+): Promise<Boolean> => {
+    return await argon2.verify(passwordHash, password);
+};
 
-    return {
-        accessToken,
-        refreshToken,
-    };
-}
-
-export const hashPassword = (password: string): Promise<string> => {
-    return argon2.hash(password);
-}
-
-export const verifyPassword = (password: string, passwordHash: string): Promise<Boolean> => {
-    return argon2.verify(passwordHash, password);
-}
-
-export const hashToken = (token: string): TokenHash | null => {
-    const hash = createHash("sha256").update(token).digest("base64");
-    const result = tokenHashSchema.safeParse(hash);
-
-    if (!result.success) {
-        return null;
-    }
-
-    return result.data ?? null;
-}
+export const hashToken = (token: string): TokenHash =>
+    tokenHashSchema.parse(createHash("sha256").update(token).digest("base64"));

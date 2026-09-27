@@ -21,8 +21,8 @@ The following improve the project but are **not substitutes for the mandatory co
 - [x] Correct mandatory table names (`refresh_tokens`, `role_permissions`) finalized
 - [x] `users` includes course-required `first_name` and `last_name`
 - [x] `refresh_tokens` includes `token_hash`, `expires_at`, `revoked_at`, `created_at` and our `jti` session identifier
-- [ ] Remaining mandatory tables completed
-- [ ] Full 24+ table schema completed
+- [x] Remaining mandatory tables completed
+- [x] Full 24+ table schema completed
 - [ ] Final ERD completed
 - [ ] All required foreign keys reviewed
 - [ ] All required indexes reviewed
@@ -42,12 +42,12 @@ The following improve the project but are **not substitutes for the mandatory co
 - [x] Login flow implemented/designed
 - [x] HTTP-only cookie design
 - [x] `access` authentication middleware started
-- [ ] Refresh-session repository
-- [ ] Refresh-token hash storage
-- [ ] Refresh rotation with DB validation
-- [ ] Logout session revocation
-- [ ] Cookie clearing
-- [ ] Authentication error middleware
+- [x] Refresh-session repository
+- [x] Refresh-token hash storage
+- [x] Refresh rotation with DB validation
+- [x] Logout session revocation
+- [x] Cookie clearing
+- [x] Authentication error middleware
 - [ ] Role/permission middleware
 - [ ] End-to-end auth manual test
 

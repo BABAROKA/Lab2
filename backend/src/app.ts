@@ -7,6 +7,7 @@ import { db } from "./db/client.js";
 
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
+import { errorHandler } from "./middleware/error.middleware.js";
 
 const app = express();
 
@@ -21,9 +22,6 @@ app.use(
 
 app.use(express.json());
 app.use(cookieParser());
-
-app.use("/auth", authRouter);
-app.use("/users", usersRouter);
 
 app.get("/health", (_req, res) => {
     res.json({
@@ -47,4 +45,8 @@ app.get("/health/db", async (_req, res) => {
     }
 });
 
+app.use("/auth", authRouter);
+app.use("/users", usersRouter);
+
+app.use(errorHandler);
 export { app };

@@ -1,15 +1,24 @@
-import { bigint, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+    index,
+    bigint,
+    pgTable,
+    text,
+    timestamp,
+    inet,
+} from "drizzle-orm/pg-core";
 import { users } from "./users";
-
 
 export const refreshTokens = pgTable(
     "refresh_tokens",
     {
-        id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
-        userId: bigint("user_id", { mode: "number" }).notNull().references(() => users.id, { onDelete: "cascade" }),
+        id: bigint("id", { mode: "number" })
+            .generatedAlwaysAsIdentity()
+            .primaryKey(),
+        userId: bigint("user_id", { mode: "number" })
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
         tokenHash: text("token_hash").notNull().unique(),
-        deviceName: text("device_name").notNull(),
-        userAgent: text("user_agent"),
+        ipAddress: inet("ip_address").notNull(),
         expiresAt: timestamp("expires_at", {
             withTimezone: true,
             mode: "date",
@@ -21,6 +30,9 @@ export const refreshTokens = pgTable(
         createdAt: timestamp("created_at", {
             withTimezone: true,
             mode: "date",
-        }).notNull().defaultNow(),
-    }
-)
+        })
+            .notNull()
+            .defaultNow(),
+    },
+    (table) => [index("refresh_tokens_user_id_index").on(table.userId)],
+);

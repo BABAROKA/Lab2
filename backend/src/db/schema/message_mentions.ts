@@ -1,33 +1,30 @@
-// files.ts
 import {
     bigint,
     index,
     pgTable,
-    text,
     timestamp,
-    uuid,
+    uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { messages } from "./messages";
 import { users } from "./users";
 
-export const files = pgTable(
-    "files",
+export const messageMentions = pgTable(
+    "message_mentions",
     {
         id: bigint("id", { mode: "number" })
             .generatedAlwaysAsIdentity()
             .primaryKey(),
 
-        uuid: uuid("uuid").defaultRandom().notNull().unique(),
-
-        storageKey: text("storage_key").notNull().unique(),
-
-        sizeBytes: bigint("size_bytes", {
+        messageId: bigint("message_id", {
             mode: "number",
-        }).notNull(),
+        })
+            .notNull()
+            .references(() => messages.id, {
+                onDelete: "cascade",
+            }),
 
-        sha256: text("sha256").notNull(),
-
-        uploadedBy: bigint("uploaded_by", {
+        userId: bigint("user_id", {
             mode: "number",
         })
             .notNull()
@@ -43,5 +40,12 @@ export const files = pgTable(
             .defaultNow(),
     },
 
-    (table) => [index("files_uploaded_by_index").on(table.uploadedBy)],
+    (table) => [
+        uniqueIndex("message_mentions_message_user_unique").on(
+            table.messageId,
+            table.userId,
+        ),
+
+        index("message_mentions_user_id_index").on(table.userId),
+    ],
 );

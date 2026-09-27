@@ -9,6 +9,13 @@ const envSchema = z.object({
     JWT_ACCESS_KEY: z.string().min(32),
     JWT_REFRESH_KEY: z.string().min(32),
     NODE_ENV: z.enum(["dev", "prod"]),
+    MAX_REFRESH_TOKEN_HISTORY: z.coerce.number().int().positive().default(50),
+    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
+    REFRESH_TOKEN_TTL_SECONDS: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(2592000),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

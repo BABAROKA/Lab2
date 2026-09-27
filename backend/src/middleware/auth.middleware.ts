@@ -1,50 +1,27 @@
 import { NextFunction, Request, Response } from "express";
-import { generateTokens, verifyAccessToken, verifyRefreshToken } from "../utils/jwt";
+import { verifyAccessToken } from "../modules/auth/auth.utils";
 import { env } from "../config/env.js";
+import { AuthService } from "../modules/auth/auth.service";
+import { UserRepository } from "../modules/users/users.repository";
+import { AuthRepository } from "../modules/auth/auth.repository";
+import { AuthenticationRequiredError } from "../errors";
 
-export const access = (
+const authService = new AuthService(new UserRepository(), new AuthRepository());
+
+export const access = async (
     req: Request,
     res: Response,
     next: NextFunction,
 ) => {
-    const accessToken: string = req.cookies.access_token;
-    const refreshToken: string = req.cookies.refresh_token;
+    const cookieAccessToken: string = req.cookies.access_token;
+    const cookieRefreshToken: string = req.cookies.refresh_token;
 
-    if (!accessToken && !refreshToken) {
-        res.status(401).json({
-            message: "Authentication required",
-        });
-        return;
-    }
-
-    if (accessToken) {
-        try {
-            const claims = verifyAccessToken(accessToken);
-
-            req.auth = {
-                uuid: claims.sub,
-            };
-            next();
-            return;
-        } catch { }
+    if (!cookieAccessToken && !cookieRefreshToken) {
+        throw new AuthenticationRequiredError();
     }
 
     try {
-        const claims = verifyRefreshToken(refreshToken);
-        const tokens = generateTokens(claims.sub);
-
-        res.cookie("access_token", tokens.accessToken, {
-            httpOnly: true,
-            sameSite: "lax",
-            secure: env.NODE_ENV === "prod",
-        });
-
-        res.cookie("refresh_token", tokens.refreshToken, {
-            httpOnly: true,
-            sameSite: "lax",
-            secure: env.NODE_ENV === "prod",
-        });
-
+        const claims = verifyAccessToken(cookieAccessToken);
         req.auth = {
             uuid: claims.sub,
         };
@@ -52,7 +29,26 @@ export const access = (
         return;
     } catch { }
 
-    res.status(401).json({
-        message: "Authentication required",
+    const ipAddrees = req.ip;
+    if (!ipAddrees) {
+        throw new AuthenticationRequiredError();
+    }
+
+    const { uuid, accessToken, refreshToken } =
+        await authService.rotateRefreshToken(cookieRefreshToken, ipAddrees);
+
+    res.cookie("access_token", accessToken, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: env.NODE_ENV === "prod",
     });
-}
+
+    res.cookie("refresh_token", refreshToken, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: env.NODE_ENV === "prod",
+    });
+
+    req.auth = { uuid };
+    next();
+};
