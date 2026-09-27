@@ -26,3 +26,5 @@ export const conversationPermissions = pgTable("conversation_permissions", {
 
     description: text("description").notNull(),
 });
+
+export type ConversationPermissionName = (typeof conversationPermissionNameEnum.enumValues)[number];

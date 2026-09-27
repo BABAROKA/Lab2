@@ -73,3 +73,5 @@ export const devices = pgTable(
 
     (table) => [index("devices_user_id_index").on(table.userId)],
 );
+
+export type DevicePlatform = (typeof devicePlatformEnum.enumValues)[number];

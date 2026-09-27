@@ -36,3 +36,5 @@ export { deviceSignedPrekeys } from "./device_signed_prekeys";
 
 export { userProfilePictures } from "./user_profile_pictures";
 export { profilePictureDeviceKeys } from "./profile_picture_device_keys";
+
+export { calls, callTypeEnum, callStatusEnum } from "./calls";

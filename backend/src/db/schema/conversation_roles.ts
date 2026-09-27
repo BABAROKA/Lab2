@@ -75,3 +75,5 @@ export const conversationRoles = pgTable(
         ),
     ],
 );
+
+export type ConversationRoleName = (typeof conversationRoleNameEnum.enumValues)[number];

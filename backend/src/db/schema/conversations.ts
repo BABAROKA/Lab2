@@ -54,3 +54,5 @@ export const conversations = pgTable("conversations", {
         .defaultNow()
         .$onUpdate(() => new Date()),
 });
+
+export type ConversationType = (typeof conversationTypeEnum.enumValues)[number];

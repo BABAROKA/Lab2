@@ -10,12 +10,8 @@ const envSchema = z.object({
     JWT_REFRESH_KEY: z.string().min(32),
     NODE_ENV: z.enum(["dev", "prod"]),
     MAX_REFRESH_TOKEN_HISTORY: z.coerce.number().int().positive().default(50),
-    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
-    REFRESH_TOKEN_TTL_SECONDS: z.coerce
-        .number()
-        .int()
-        .positive()
-        .default(2592000),
+    FILE_STORAGE_ROOT: z.string().default("./data/files"),
+    MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().default(52_428_800),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

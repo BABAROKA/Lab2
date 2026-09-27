@@ -20,3 +20,5 @@ export const roles = pgTable(
         }).notNull().defaultNow(),
     }
 );
+
+export type RoleName = (typeof roleNameEnum.enumValues)[number];

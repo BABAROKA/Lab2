@@ -21,3 +21,5 @@ export const permissions = pgTable(
         description: text("description").notNull(),
     }
 );
+
+export type PermissionName = (typeof permissionNameEnum.enumValues)[number];
